@@ -171,6 +171,14 @@ func preRun(configPath string) error {
 	// init
 	setEnv()
 
+	// Fallback: 环境变量 NZ_NAME / NZ_GROUP
+	if cliServerName == "" {
+		cliServerName = os.Getenv("NZ_NAME")
+	}
+	if cliServerGroup == "" {
+		cliServerGroup = os.Getenv("NZ_GROUP")
+	}
+
 	if configPath == "" {
 		configPath = defaultConfigPath
 	}
@@ -255,16 +263,22 @@ func main() {
 				UsageText: "<install/uninstall/start/stop/restart>",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "配置文件路径"},
+					&cli.StringFlag{Name: "name", Aliases: []string{"n"}, Usage: "服务器显示名称(仅首次注册)"},
+					&cli.StringFlag{Name: "group", Aliases: []string{"g"}, Usage: "服务器分组名称(仅首次注册)"},
 				},
 				Action: func(c *cli.Context) error {
+					// 读取CLI传入的名称和分组
+					cliServerName = c.String("name")
+					cliServerGroup = c.String("group")
+
 					if arg := c.Args().Get(0); arg != "" {
+						var cfgPath string
 						if path := c.String("config"); path != "" {
-							ap, _ := filepath.Abs(path)
-							runService(arg, ap)
+							cfgPath, _ = filepath.Abs(path)
 						} else {
-							ap, _ := filepath.Abs(defaultConfigPath)
-							runService(arg, ap)
+							cfgPath, _ = filepath.Abs(defaultConfigPath)
 						}
+						runService(arg, cfgPath)
 						return nil
 					}
 					return cli.Exit("必须指定一个参数", 1)
