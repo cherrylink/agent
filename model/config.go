@@ -125,9 +125,7 @@ func ValidateConfig(c *AgentConfig, isRemoteEdit bool) error {
 			return errors.New("client_secret must be specified")
 		}
 
-		if _, err := uuid.ParseUUID(c.UUID); err != nil {
-			return err
-		}
+		// UUID 验证已删除，允许任意格式的 UUID
 	}
 
 	return nil
