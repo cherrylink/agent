@@ -23,6 +23,10 @@ type AgentConfig struct {
 	ClientSecret string `koanf:"client_secret" json:"client_secret"` // 客户端密钥
 	UUID         string `koanf:"uuid" json:"uuid"`
 
+	// 新增字段 - 服务器自定义信息
+	ServerName  string `koanf:"server_name" json:"server_name"`   // 服务器显示名称
+	ServerGroup string `koanf:"server_group" json:"server_group"` // 服务器分组名称
+
 	HardDrivePartitionAllowlist []string        `koanf:"hard_drive_partition_allowlist" json:"hard_drive_partition_allowlist,omitempty"`
 	NICAllowlist                map[string]bool `koanf:"nic_allowlist" json:"nic_allowlist,omitempty"`
 	DNS                         []string        `koanf:"dns" json:"dns,omitempty"`
@@ -85,6 +89,16 @@ func (c *AgentConfig) Read(path string) error {
 	}
 
 	return ValidateConfig(c, false)
+}
+
+// checkMigration 配置迁移检查，提示用户关于新配置选项
+func (c *AgentConfig) CheckMigration() {
+	if c.ServerName == "" {
+		fmt.Printf("提示：可以设置 server_name 来自定义服务器显示名称\n")
+	}
+	if c.ServerGroup == "" {
+		fmt.Printf("提示：可以设置 server_group 来自动加入服务器分组\n")
+	}
 }
 
 func (c *AgentConfig) Save() error {

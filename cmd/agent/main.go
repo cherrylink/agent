@@ -42,6 +42,7 @@ import (
 	"github.com/nezhahq/agent/pkg/util"
 	utlsx "github.com/nezhahq/agent/pkg/utls"
 	pb "github.com/nezhahq/agent/proto"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -125,6 +126,43 @@ func loadDefaultConfigPath() string {
 	return filepath.Join(filepath.Dir(executablePath), "config.yml")
 }
 
+// handleConnectionError 增强错误处理，识别服务器注册相关错误
+func handleConnectionError(err error) {
+	if err == nil {
+		return
+	}
+
+	// 解析gRPC状态错误
+	if st, ok := status.FromError(err); ok {
+		switch st.Message() {
+		case "客户端标识符不合法，必须为1-64个字符":
+			printf("错误：客户端ID格式不正确，请检查配置文件中的 client_id 字段")
+		case "指定的服务器分组不存在":
+			printf("错误：指定的服务器分组不存在，请检查配置文件中的 server_group 字段")
+		case "指定的服务器分组不存在或无权限访问":
+			printf("错误：无权限访问指定的服务器分组，请联系管理员")
+		case "查询服务器分组失败":
+			printf("错误：服务器分组查询失败，请检查网络连接")
+		default:
+			printf("连接错误：%v", st.Message())
+		}
+	} else {
+		printf("连接失败：%v", err)
+	}
+}
+
+// logSuccessfulRegistration 添加连接成功日志
+func logSuccessfulRegistration() {
+	printf("服务器注册成功")
+	printf("  - 客户端ID: %s", agentConfig.UUID)
+	if agentConfig.ServerName != "" {
+		printf("  - 服务器名称: %s", agentConfig.ServerName)
+	}
+	if agentConfig.ServerGroup != "" {
+		printf("  - 服务器分组: %s", agentConfig.ServerGroup)
+	}
+}
+
 func preRun(configPath string) error {
 	// init
 	setEnv()
@@ -155,6 +193,9 @@ func preRun(configPath string) error {
 	if err := agentConfig.Read(configPath); err != nil {
 		return fmt.Errorf("init config failed: %v", err)
 	}
+
+	// 检查配置迁移提示
+	agentConfig.CheckMigration()
 
 	monitor.InitConfig(&agentConfig)
 	monitor.CustomEndpoints = agentConfig.CustomIPApi
@@ -230,7 +271,9 @@ func main() {
 func run() {
 	auth := model.AuthHandler{
 		ClientSecret: agentConfig.ClientSecret,
-		ClientUUID:   agentConfig.UUID,
+		ClientUUID:   agentConfig.UUID, // 直接使用UUID
+		ServerName:   agentConfig.ServerName,
+		ServerGroup:  agentConfig.ServerGroup,
 	}
 
 	// 定时检查更新
@@ -276,6 +319,7 @@ func run() {
 		conn, err = grpc.NewClient(agentConfig.Server, securityOption, grpc.WithPerRPCCredentials(&auth))
 		if err != nil {
 			printf("与面板建立连接失败: %v", err)
+			handleConnectionError(err)
 			retry()
 			continue
 		}
@@ -286,6 +330,7 @@ func run() {
 		dashboardBootTimeReceipt, err = client.ReportSystemInfo2(timeOutCtx, monitor.GetHost().PB())
 		if err != nil {
 			printf("上报系统信息失败: %v", err)
+			handleConnectionError(err)
 			cancel()
 			retry()
 			continue
@@ -295,6 +340,9 @@ func run() {
 		geoipReported = geoipReported && prevDashboardBootTime > 0 && dashboardBootTimeReceipt.GetData() == prevDashboardBootTime
 		prevDashboardBootTime = dashboardBootTimeReceipt.GetData()
 		initialized = true
+
+		// 记录成功注册日志
+		logSuccessfulRegistration()
 
 		wCtx, wCancel := context.WithCancel(context.Background())
 

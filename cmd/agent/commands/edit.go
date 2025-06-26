@@ -74,6 +74,20 @@ func EditAgentConfig(configPath string, agentConfig *model.AgentConfig) {
 			},
 		},
 		{
+			Name: "server_name",
+			Prompt: &survey.Input{
+				Message: "服务器显示名称（可选）",
+				Default: agentConfig.ServerName,
+			},
+		},
+		{
+			Name: "server_group",
+			Prompt: &survey.Input{
+				Message: "服务器分组名称（可选，必须是已存在的分组）",
+				Default: agentConfig.ServerGroup,
+			},
+		},
+		{
 			Name: "gpu",
 			Prompt: &survey.Confirm{
 				Message: "是否启用 GPU 监控？",
@@ -104,6 +118,8 @@ func EditAgentConfig(configPath string, agentConfig *model.AgentConfig) {
 		Temperature bool     `mapstructure:"temperature" json:"temperature"`
 		Debug       bool     `mapstructure:"debug" json:"debug"`
 		UUID        string   `mapstructure:"uuid" json:"uuid"`
+		ServerName  string   `mapstructure:"server_name" json:"server_name"`
+		ServerGroup string   `mapstructure:"server_group" json:"server_group"`
 	}{}
 
 	err = survey.Ask(qs, &answers, survey.WithValidator(survey.Required))
@@ -145,6 +161,8 @@ func EditAgentConfig(configPath string, agentConfig *model.AgentConfig) {
 	agentConfig.Temperature = answers.Temperature
 	agentConfig.Debug = answers.Debug
 	agentConfig.UUID = answers.UUID
+	agentConfig.ServerName = answers.ServerName
+	agentConfig.ServerGroup = answers.ServerGroup
 
 	if err = agentConfig.Save(); err != nil {
 		panic(err)
