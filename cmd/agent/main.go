@@ -58,6 +58,10 @@ var (
 	lastReportHostInfo    time.Time
 	lastReportIPInfo      time.Time
 
+	// 新增：从 CLI 读取的服务器名称和分组，仅在首次注册时发送一次
+	cliServerName  string
+	cliServerGroup string
+
 	hostStatus   atomic.Bool
 	ipStatus     atomic.Bool
 	reloadStatus atomic.Bool
@@ -155,11 +159,11 @@ func handleConnectionError(err error) {
 func logSuccessfulRegistration() {
 	printf("服务器注册成功")
 	printf("  - 客户端ID: %s", agentConfig.UUID)
-	if agentConfig.ServerName != "" {
-		printf("  - 服务器名称: %s", agentConfig.ServerName)
+	if cliServerName != "" {
+		printf("  - 服务器名称: %s", cliServerName)
 	}
-	if agentConfig.ServerGroup != "" {
-		printf("  - 服务器分组: %s", agentConfig.ServerGroup)
+	if cliServerGroup != "" {
+		printf("  - 服务器分组: %s", cliServerGroup)
 	}
 }
 
@@ -209,8 +213,14 @@ func main() {
 		Version: version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "配置文件路径"},
+			&cli.StringFlag{Name: "name", Aliases: []string{"n"}, Usage: "服务器显示名称(仅首次注册)"},
+			&cli.StringFlag{Name: "group", Aliases: []string{"g"}, Usage: "服务器分组名称(仅首次注册)"},
 		},
 		Action: func(c *cli.Context) error {
+			// 读取 CLI 传入的名称和分组，仅本次运行有效
+			cliServerName = c.String("name")
+			cliServerGroup = c.String("group")
+
 			if path := c.String("config"); path != "" {
 				if err := preRun(path); err != nil {
 					return err
@@ -271,9 +281,9 @@ func main() {
 func run() {
 	auth := model.AuthHandler{
 		ClientSecret: agentConfig.ClientSecret,
-		ClientUUID:   agentConfig.UUID, // 直接使用UUID
-		ServerName:   agentConfig.ServerName,
-		ServerGroup:  agentConfig.ServerGroup,
+		ClientUUID:   agentConfig.UUID,
+		ServerName:   cliServerName,
+		ServerGroup:  cliServerGroup,
 	}
 
 	// 定时检查更新
